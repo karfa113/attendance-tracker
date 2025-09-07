@@ -41,9 +41,8 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({
 
   const addSubjectToDay = (dayId: string, subjectId: string) => {
     const daySchedule = getDaySchedule(dayId);
-    if (!daySchedule.subjects.includes(subjectId)) {
-      onUpdateSchedule(dayId, [...daySchedule.subjects, subjectId]);
-    }
+    // Allow duplicates for multiple classes (e.g., labs)
+    onUpdateSchedule(dayId, [...daySchedule.subjects, subjectId]);
   };
 
   const removeSubjectFromDay = (dayId: string, subjectId: string) => {
@@ -116,22 +115,17 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({
                       Add subjects to {day.name}:
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      {subjects
-                        .filter(subject => !daySchedule.subjects.includes(subject.id))
-                        .map((subject) => (
-                          <button
-                            key={subject.id}
-                            onClick={() => addSubjectToDay(day.id, subject.id)}
-                            className="flex items-center gap-2 px-3 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-                          >
-                            <Plus className="w-4 h-4" />
-                            {subject.name}
-                          </button>
-                        ))}
+                      {subjects.map((subject) => (
+                        <button
+                          key={subject.id}
+                          onClick={() => addSubjectToDay(day.id, subject.id)}
+                          className="flex items-center gap-2 px-3 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          {subject.name}
+                        </button>
+                      ))}
                     </div>
-                    {subjects.filter(subject => !daySchedule.subjects.includes(subject.id)).length === 0 && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">All subjects are already scheduled for this day</p>
-                    )}
                   </div>
                 )}
               </div>

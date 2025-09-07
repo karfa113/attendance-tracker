@@ -16,7 +16,7 @@ import { Subject, DaySchedule, AttendanceRecord, TodoItem, UserSettings } from '
 function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [showSettings, setShowSettings] = useState(false);
-  
+
   // Data management with localStorage
   const [subjects, setSubjects] = useLocalStorage<Subject[]>('subjects', defaultSubjects);
   const [schedules, setSchedules] = useLocalStorage<DaySchedule[]>('schedules', defaultSchedules);
@@ -40,7 +40,7 @@ function App() {
   };
 
   const handleUpdateSubject = (id: string, updates: Partial<Subject>) => {
-    setSubjects(subjects.map(subject => 
+    setSubjects(subjects.map(subject =>
       subject.id === id ? { ...subject, ...updates } : subject
     ));
   };
@@ -72,11 +72,11 @@ function App() {
     }
   };
 
-  // Attendance management
-  const handleMarkAttendance = (subjectId: string, status: 'attended' | 'absent' | 'off' | null) => {
+  // Attendance management (now supports multiple occurrences per day)
+  const handleMarkAttendance = (subjectId: string, occurrence: number, status: 'attended' | 'absent' | 'off' | null) => {
     const today = new Date().toISOString().split('T')[0];
-    const existingRecord = records.find(record => 
-      record.subjectId === subjectId && record.date === today
+    const existingRecord = records.find(record =>
+      record.subjectId === subjectId && record.date === today && record.occurrence === occurrence
     );
 
     if (status === null) {
@@ -88,7 +88,7 @@ function App() {
       if (existingRecord) {
         // Update existing record
         setRecords(records.map(record =>
-          record.id === existingRecord.id 
+          record.id === existingRecord.id
             ? { ...record, status, timestamp: Date.now() }
             : record
         ));
@@ -98,6 +98,7 @@ function App() {
           id: Date.now().toString(),
           subjectId,
           date: today,
+          occurrence,
           status,
           timestamp: Date.now()
         };
@@ -184,7 +185,7 @@ function App() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors">
       <Header onSettingsClick={() => setShowSettings(true)} />
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderContent()}
       </main>

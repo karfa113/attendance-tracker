@@ -3,19 +3,23 @@ import { Calendar, Coffee, CheckCircle, XCircle, Clock, Minus } from 'lucide-rea
 import { Subject, AttendanceRecord } from '../types/attendance';
 import { getTodaySchedule } from '../utils/attendanceCalculations';
 
-interface HomeProps {
+
+export interface HomeProps {
   subjects: Subject[];
   schedules: any[];
   records: AttendanceRecord[];
-  onMarkAttendance: (subjectId: string, status: 'attended' | 'absent' | 'off' | null) => void;
+  onMarkAttendance: (subjectId: string, occurrence: number, status: 'attended' | 'absent' | 'off' | null) => void;
 }
 
 export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMarkAttendance }) => {
+
+
   const todaySubjects = getTodaySchedule(schedules, subjects);
   const today = new Date().toISOString().split('T')[0];
-  
-  const getTodayRecord = (subjectId: string) => {
-    return records.find(record => record.subjectId === subjectId && record.date === today);
+
+  // todaySubjects can have duplicate subjects for multiple classes
+  const getTodayRecord = (subjectId: string, occurrence: number) => {
+    return records.find(record => record.subjectId === subjectId && record.date === today && record.occurrence === occurrence);
   };
 
   const getStatusButton = (status: string, isActive: boolean, onClick: () => void, icon: React.ReactNode, label: string) => {
@@ -27,7 +31,7 @@ export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMark
       clear: "bg-blue-500 text-white shadow-lg"
     };
     const inactiveClasses = "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700";
-    
+
     return (
       <button
         onClick={onClick}
@@ -48,7 +52,7 @@ export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMark
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Day Off! 🎉</h2>
             <p className="text-gray-600 dark:text-gray-400">No classes scheduled for today. Enjoy your free time!</p>
           </div>
-          
+
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Make the most of your day</h3>
             <p className="text-gray-600 dark:text-gray-400">
@@ -68,35 +72,37 @@ export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMark
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Today's Classes</h2>
             <p className="text-gray-600 dark:text-gray-400">
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+              {new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
               })}
             </p>
           </div>
         </div>
 
         <div className="space-y-4">
-          {todaySubjects.map((subject) => {
-            const record = getTodayRecord(subject.id);
+          {todaySubjects.map((subject, idx) => {
+            // idx is the occurrence index for this subject today
+            const record = getTodayRecord(subject.id, idx);
             const currentStatus = record?.status;
 
             return (
               <div
-                key={subject.id}
+                key={subject.id + '-' + idx}
                 className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div 
+                    <div
                       className="w-4 h-4 rounded-full"
                       style={{ backgroundColor: subject.color }}
                     />
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white">{subject.name}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">{subject.code}</p>
+                      <span className="text-xs text-gray-400">Class {idx + 1} today</span>
                     </div>
                   </div>
                   {currentStatus && (
@@ -110,28 +116,28 @@ export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMark
                   {getStatusButton(
                     'attended',
                     currentStatus === 'attended',
-                    () => onMarkAttendance(subject.id, 'attended'),
+                    () => onMarkAttendance(subject.id, idx, 'attended'),
                     <CheckCircle className="w-4 h-4" />,
                     'Attended'
                   )}
                   {getStatusButton(
                     'absent',
                     currentStatus === 'absent',
-                    () => onMarkAttendance(subject.id, 'absent'),
+                    () => onMarkAttendance(subject.id, idx, 'absent'),
                     <XCircle className="w-4 h-4" />,
                     'Absent'
                   )}
                   {getStatusButton(
                     'off',
                     currentStatus === 'off',
-                    () => onMarkAttendance(subject.id, 'off'),
+                    () => onMarkAttendance(subject.id, idx, 'off'),
                     <Clock className="w-4 h-4" />,
                     'Off'
                   )}
                   {getStatusButton(
                     'clear',
                     false,
-                    () => onMarkAttendance(subject.id, null),
+                    () => onMarkAttendance(subject.id, idx, null),
                     <Minus className="w-4 h-4" />,
                     'Clear'
                   )}

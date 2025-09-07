@@ -19,6 +19,7 @@ export interface AttendanceRecord {
   id: string;
   subjectId: string;
   date: string;
+  occurrence: number; // index of the class occurrence for the day
   status: 'attended' | 'absent' | 'off' | null;
   timestamp: number;
 }
