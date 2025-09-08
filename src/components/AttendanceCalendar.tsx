@@ -184,19 +184,23 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps & { schedules:
         <div className="grid grid-cols-7 gap-1 mb-6">
           {calendarDays}
         </div>
-        {/* Legend */}
-        <div className="flex flex-wrap gap-6 mb-8 text-base justify-center">
+        {/* Legend - efficient color coding with round dots */}
+        <div className="flex flex-wrap gap-8 mb-8 text-base justify-center">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-3 bg-green-500 rounded-sm"></div>
+            <span className="w-3 h-3 rounded-full bg-green-400 inline-block"></span>
             <span className="text-gray-700 dark:text-gray-200">Attended</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-5 h-3 bg-red-500 rounded-sm"></div>
+            <span className="w-3 h-3 rounded-full bg-red-400 inline-block"></span>
             <span className="text-gray-700 dark:text-gray-200">Absent</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-5 h-3 bg-blue-500 rounded-sm"></div>
+            <span className="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span>
             <span className="text-gray-700 dark:text-gray-200">Off</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-gray-400 inline-block"></span>
+            <span className="text-gray-700 dark:text-gray-200">Not marked</span>
           </div>
         </div>
         {/* Attendance details for selected day: always show scheduled classes for that weekday */}
