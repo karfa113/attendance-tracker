@@ -5,17 +5,19 @@ import { AttendanceRecord, Subject } from '../types/attendance';
 interface AttendanceCalendarProps {
   records: AttendanceRecord[];
   subjects: Subject[];
+  onEditAttendance: (date: string, subjectId: string, occurrence: number, status: 'attended' | 'absent' | 'off' | null) => void;
 }
 
-export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ records, subjects }) => {
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 0, 1)); // January 2024
+export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ records, subjects, onEditAttendance }) => {
+  // Start with today as default
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null | undefined) => {
     switch (status) {
-      case 'present': return 'bg-green-500';
+      case 'attended': return 'bg-green-500';
       case 'absent': return 'bg-red-500';
-      case 'late': return 'bg-amber-500';
-      case 'excused': return 'bg-blue-500';
+      case 'off': return 'bg-blue-500';
       default: return 'bg-gray-300';
     }
   };
@@ -40,32 +42,40 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ records,
   const renderCalendarDay = (day: number, isCurrentMonth: boolean) => {
     const dayRecords = getRecordsForDate(day);
     const hasRecords = dayRecords.length > 0;
-
+    const isSelected = isCurrentMonth && selectedDay === day;
     return (
-      <div
+      <button
         key={day}
-        className={`min-h-[80px] p-2 border border-gray-200 ${
-          isCurrentMonth ? 'bg-white' : 'bg-gray-50'
-        } ${hasRecords ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+        type="button"
+        onClick={() => isCurrentMonth && setSelectedDay(day)}
+        className={`min-h-[64px] w-full p-2 border border-transparent flex flex-col items-center justify-start rounded-lg transition-all
+          ${isCurrentMonth
+            ? (isSelected
+              ? 'bg-blue-600 text-white dark:bg-blue-500 dark:text-white'
+              : 'bg-white hover:bg-blue-50 text-gray-900 dark:bg-gray-800 dark:hover:bg-blue-900 dark:text-gray-100')
+            : 'bg-gray-50 text-gray-400 dark:bg-gray-900 dark:text-gray-600'}
+          ${isCurrentMonth ? 'cursor-pointer' : 'cursor-default'}
+        `}
+        style={{ outline: isSelected ? '2px solid #2563eb' : undefined }}
       >
-        <div className={`text-sm font-medium ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}`}>
+        <div className={`text-base font-semibold ${isSelected ? 'text-white dark:text-white' : isCurrentMonth ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-600'}`}>
           {day}
         </div>
         {hasRecords && (
-          <div className="space-y-1 mt-1">
+          <div className="flex gap-1 mt-1">
             {dayRecords.map((record, index) => {
               const subject = subjects.find(s => s.id === record.subjectId);
               return (
                 <div
                   key={index}
-                  className={`w-full h-2 rounded-sm ${getStatusColor(record.status)}`}
+                  className={`w-3 h-3 rounded-full border-2 border-white dark:border-gray-800 ${getStatusColor(record.status || undefined)}`}
                   title={`${subject?.code || 'Unknown'} - ${record.status}`}
                 />
               );
             })}
           </div>
         )}
-      </div>
+      </button>
     );
   };
 
@@ -75,20 +85,41 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ records,
 
   const calendarDays = [];
 
-  // Previous month days
-  for (let i = firstDayOfMonth - 1; i >= 0; i--) {
-    calendarDays.push(renderCalendarDay(daysInPrevMonth - i, false));
+  // Previous month days (disabled)
+  if (firstDayOfMonth > 0) {
+    for (let i = firstDayOfMonth - 1; i >= 0; i--) {
+      calendarDays.push(
+        <button
+          key={`prev-${i}`}
+          type="button"
+          disabled
+          className="min-h-[64px] w-full p-2 flex flex-col items-center justify-start rounded-lg bg-transparent text-gray-400 dark:text-gray-700 cursor-default"
+        >
+          <div className="text-base font-semibold">{daysInPrevMonth - i}</div>
+        </button>
+      );
+    }
   }
 
-  // Current month days
+  // Current month days (interactive)
   for (let day = 1; day <= daysInMonth; day++) {
     calendarDays.push(renderCalendarDay(day, true));
   }
 
-  // Next month days to fill the grid
-  const remainingDays = 42 - calendarDays.length;
-  for (let day = 1; day <= remainingDays; day++) {
-    calendarDays.push(renderCalendarDay(day, false));
+  // Next month days (disabled)
+  const totalCells = calendarDays.length;
+  const nextMonthDays = (7 - (totalCells % 7)) % 7;
+  for (let day = 1; day <= nextMonthDays; day++) {
+    calendarDays.push(
+      <button
+        key={`next-${day}`}
+        type="button"
+        disabled
+        className="min-h-[64px] w-full p-2 flex flex-col items-center justify-start rounded-lg bg-transparent text-gray-400 dark:text-gray-700 cursor-default"
+      >
+        <div className="text-base font-semibold">{day}</div>
+      </button>
+    );
   }
 
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -98,66 +129,112 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ records,
   ];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Attendance Calendar
-          </h2>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigateMonth(-1)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <h3 className="text-lg font-medium text-gray-900 min-w-[150px] text-center">
-              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </h3>
-            <button
-              onClick={() => navigateMonth(1)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+    <div className="flex justify-center items-center min-h-[80vh] bg-gray-50 dark:bg-gray-950 py-8">
+      <div className="w-full max-w-2xl bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <Calendar className="w-7 h-7 text-blue-400" />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Edit Attendance by Date</h2>
         </div>
-      </div>
-
-      <div className="p-6">
-        {/* Legend */}
-        <div className="flex flex-wrap gap-4 mb-6 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-2 bg-green-500 rounded-sm"></div>
-            <span>Present</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-2 bg-amber-500 rounded-sm"></div>
-            <span>Late</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-2 bg-red-500 rounded-sm"></div>
-            <span>Absent</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-2 bg-blue-500 rounded-sm"></div>
-            <span>Excused</span>
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => navigateMonth(-1)}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <ChevronLeft className="w-6 h-6 text-gray-400 dark:text-gray-300" />
+          </button>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white min-w-[180px] text-center">
+            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+          </h3>
+          <button
+            onClick={() => navigateMonth(1)}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <ChevronRight className="w-6 h-6 text-gray-400 dark:text-gray-300" />
+          </button>
         </div>
-
-        {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-0 border border-gray-200 rounded-lg overflow-hidden">
-          {/* Week day headers */}
+        {/* Weekday headers */}
+        <div className="grid grid-cols-7 gap-0 mb-2">
           {weekDays.map(day => (
-            <div key={day} className="bg-gray-100 p-3 text-center text-sm font-medium text-gray-700 border-b border-gray-200">
+            <div key={day} className="text-center text-base font-medium text-gray-500 dark:text-gray-400 py-2">
               {day}
             </div>
           ))}
-          
-          {/* Calendar days */}
+        </div>
+        {/* Calendar grid */}
+        <div className="grid grid-cols-7 gap-1 mb-6">
           {calendarDays}
         </div>
+        {/* Legend */}
+        <div className="flex flex-wrap gap-6 mb-8 text-base justify-center">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-3 bg-green-500 rounded-sm"></div>
+            <span className="text-gray-700 dark:text-gray-200">Attended</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-3 bg-red-500 rounded-sm"></div>
+            <span className="text-gray-700 dark:text-gray-200">Absent</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-3 bg-blue-500 rounded-sm"></div>
+            <span className="text-gray-700 dark:text-gray-200">Off</span>
+          </div>
+        </div>
+        {/* Attendance details for selected day */}
+        {selectedDay && (
+          <div className="mt-6 bg-gray-100 dark:bg-gray-800 rounded-xl p-6">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              {monthNames[currentDate.getMonth()]} {selectedDay}, {currentDate.getFullYear()}
+            </h4>
+            {/* List subjects and attendance for the selected day */}
+            {(() => {
+              const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+              const dayRecords = records.filter(record => record.date === dateStr);
+              if (dayRecords.length === 0) {
+                return <div className="text-gray-400 italic">No attendance records for this date.</div>;
+              }
+              return dayRecords.map((record, idx) => {
+                const subject = subjects.find(s => s.id === record.subjectId);
+                const statusOptions: Array<{ value: 'attended' | 'absent' | 'off' | null, color: string, label: string }> = [
+                  { value: 'attended', color: 'bg-green-500', label: 'Attended' },
+                  { value: 'absent', color: 'bg-red-500', label: 'Absent' },
+                  { value: 'off', color: 'bg-blue-500', label: 'Off' },
+                  { value: null, color: 'bg-gray-700', label: 'Clear' },
+                ];
+                return (
+                  <div key={idx} className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                    <div className="flex items-center gap-3">
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: subject?.color || '#6B7280' }}></span>
+                      <span className="font-semibold text-gray-900 dark:text-white">{subject?.name || 'Unknown'}</span>
+                      <span className="text-gray-500 dark:text-gray-400 text-sm">{subject?.code}</span>
+                      <span className="text-gray-500 dark:text-gray-400 text-sm">Class {record.occurrence + 1}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {statusOptions.map(option => (
+                        <button
+                          key={option.label}
+                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center focus:outline-none transition-colors
+                            ${option.color} ${record.status === option.value ? 'ring-2 ring-blue-400' : 'opacity-60 hover:opacity-100'}`}
+                          title={option.label}
+                          onClick={() => onEditAttendance(
+                            `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
+                            record.subjectId,
+                            record.occurrence ?? 0,
+                            option.value
+                          )}
+                          aria-label={option.label}
+                        >
+                          {option.value === null ? (
+                            <span className="w-3 h-3 rounded-full bg-gray-200 dark:bg-gray-900 block"></span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        )}
       </div>
     </div>
   );

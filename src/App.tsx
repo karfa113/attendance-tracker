@@ -12,6 +12,7 @@ import { useTheme } from './hooks/useTheme';
 import { calculateAttendanceStats } from './utils/attendanceCalculations';
 import { defaultSubjects, defaultSchedules, defaultSettings } from './data/defaultData';
 import { Subject, DaySchedule, AttendanceRecord, TodoItem, UserSettings } from './types/attendance';
+import { AttendanceCalendar } from './components/AttendanceCalendar';
 
 function App() {
   const [activeTab, setActiveTab] = useState('home');
@@ -141,6 +142,45 @@ function App() {
             schedules={schedules}
             records={records}
             onMarkAttendance={handleMarkAttendance}
+          />
+        );
+      case 'calendar':
+        return (
+          <AttendanceCalendar
+            records={records}
+            subjects={subjects}
+            onEditAttendance={(
+              date: string,
+              subjectId: string,
+              occurrence: number,
+              status: 'attended' | 'absent' | 'off' | null
+            ) => {
+              // Find if record exists for this date/subject/occurrence
+              const existing = records.find(r => r.date === date && r.subjectId === subjectId && r.occurrence === occurrence);
+              if (status === null) {
+                if (existing) {
+                  setRecords(records.filter(r => r.id !== existing.id));
+                }
+              } else {
+                if (existing) {
+                  setRecords(records.map(r =>
+                    r.id === existing.id ? { ...r, status, timestamp: Date.now() } : r
+                  ));
+                } else {
+                  setRecords([
+                    ...records,
+                    {
+                      id: Date.now().toString(),
+                      subjectId,
+                      date,
+                      occurrence,
+                      status,
+                      timestamp: Date.now()
+                    }
+                  ]);
+                }
+              }
+            }}
           />
         );
       case 'subjects':
