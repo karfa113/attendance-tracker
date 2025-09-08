@@ -233,9 +233,17 @@ function App() {
     }
   };
 
+  // Calculate total attendance percentage across all subjects (weighted by total classes)
+  const totalAttended = stats.reduce((sum, s) => sum + s.attendedClasses, 0);
+  const totalClasses = stats.reduce((sum, s) => sum + s.totalClasses, 0);
+  const totalAttendancePercentage = totalClasses > 0 ? (totalAttended / totalClasses) * 100 : 0;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors">
-      <Header onSettingsClick={() => setShowSettings(true)} />
+      <Header
+        onSettingsClick={() => setShowSettings(true)}
+        totalAttendancePercentage={totalAttendancePercentage}
+      />
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

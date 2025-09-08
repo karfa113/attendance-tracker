@@ -2,11 +2,13 @@ import React from 'react';
 import { Settings, BookOpen } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
+
 interface HeaderProps {
   onSettingsClick: () => void;
+  totalAttendancePercentage?: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onSettingsClick }) => {
+export const Header: React.FC<HeaderProps> = ({ onSettingsClick, totalAttendancePercentage }) => {
   return (
     <header className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -22,6 +24,23 @@ export const Header: React.FC<HeaderProps> = ({ onSettingsClick }) => {
           </div>
 
           <div className="flex items-center gap-3">
+            {typeof totalAttendancePercentage === 'number' && (
+              <div
+                className={
+                  'px-3 py-1 rounded-lg font-semibold text-sm border ' +
+                  (totalAttendancePercentage >= 90
+                    ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700'
+                    : totalAttendancePercentage >= 80
+                      ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700'
+                      : totalAttendancePercentage >= 75
+                        ? 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700'
+                        : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700')
+                }
+                title="Total attendance percentage"
+              >
+                {totalAttendancePercentage.toFixed(1)}%
+              </div>
+            )}
             <ThemeToggle />
             <button
               onClick={onSettingsClick}
