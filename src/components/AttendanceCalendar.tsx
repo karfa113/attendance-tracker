@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Check, X, Clock, Minus } from 'lucide-react';
 import { AttendanceRecord, Subject } from '../types/attendance';
 
 interface AttendanceCalendarProps {
@@ -241,7 +241,7 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps & { schedules:
                           <span className="text-gray-500 dark:text-gray-400 text-sm">Class 1</span>
                         </div>
                         <div className="flex gap-2">
-                          {[{ value: 'attended', color: 'bg-green-500', label: 'Attended' }, { value: 'absent', color: 'bg-red-500', label: 'Absent' }, { value: 'off', color: 'bg-blue-500', label: 'Off' }, { value: null, color: 'bg-gray-700', label: 'Clear' }].map(option => (
+                          {[{ value: 'attended', color: 'bg-green-500', label: 'Attended', icon: <Check className="w-4 h-4" /> }, { value: 'absent', color: 'bg-red-500', label: 'Absent', icon: <X className="w-4 h-4" /> }, { value: 'off', color: 'bg-blue-500', label: 'Off', icon: <Clock className="w-4 h-4" /> }, { value: null, color: 'bg-gray-700', label: 'Clear', icon: <Minus className="w-4 h-4" /> }].map(option => (
                             <button
                               key={option.label}
                               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center focus:outline-none transition-colors
@@ -255,9 +255,7 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps & { schedules:
                               )}
                               aria-label={option.label}
                             >
-                              {option.value === null ? (
-                                <span className="w-3 h-3 rounded-full bg-gray-200 dark:bg-gray-900 block"></span>
-                              ) : null}
+                              {option.icon}
                             </button>
                           ))}
                         </div>
@@ -275,7 +273,7 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps & { schedules:
                           <span className="text-gray-500 dark:text-gray-400 text-sm">Class {record.occurrence + 1}</span>
                         </div>
                         <div className="flex gap-2">
-                          {[{ value: 'attended', color: 'bg-green-500', label: 'Attended' }, { value: 'absent', color: 'bg-red-500', label: 'Absent' }, { value: 'off', color: 'bg-blue-500', label: 'Off' }, { value: null, color: 'bg-gray-700', label: 'Clear' }].map(option => (
+                          {[{ value: 'attended', color: 'bg-green-500', label: 'Attended', icon: <Check className="w-4 h-4" /> }, { value: 'absent', color: 'bg-red-500', label: 'Absent', icon: <X className="w-4 h-4" /> }, { value: 'off', color: 'bg-blue-500', label: 'Off', icon: <Clock className="w-4 h-4" /> }, { value: null, color: 'bg-gray-700', label: 'Clear', icon: <Minus className="w-4 h-4" /> }].map(option => (
                             <button
                               key={option.label}
                               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center focus:outline-none transition-colors
@@ -289,9 +287,7 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps & { schedules:
                               )}
                               aria-label={option.label}
                             >
-                              {option.value === null ? (
-                                <span className="w-3 h-3 rounded-full bg-gray-200 dark:bg-gray-900 block"></span>
-                              ) : null}
+                              {option.icon}
                             </button>
                           ))}
                         </div>
