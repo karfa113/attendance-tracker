@@ -1,7 +1,7 @@
 import React from 'react';
 import { Calendar, Coffee, CheckCircle, XCircle, Clock, Minus } from 'lucide-react';
 import { Subject, AttendanceRecord } from '../types/attendance';
-import { getTodaySchedule } from '../utils/attendanceCalculations';
+
 
 
 export interface HomeProps {
@@ -9,17 +9,52 @@ export interface HomeProps {
   schedules: any[];
   records: AttendanceRecord[];
   onMarkAttendance: (subjectId: string, occurrence: number, status: 'attended' | 'absent' | 'off' | null) => void;
+  onBulkMarkAttendance?: (updates: { subjectId: string; occurrence: number; status: 'attended' | 'absent' | 'off' | null }[]) => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMarkAttendance }) => {
+export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMarkAttendance, onBulkMarkAttendance }) => {
 
 
-  const todaySubjects = getTodaySchedule(schedules, subjects);
+  // Get today's schedule as a flat list of subject occurrences (not just unique subjects)
+  // Build a list of { subject, occurrence } for today
+  const todayScheduleRaw = (() => {
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const schedule = schedules.find((s: any) => s.day === today);
+    if (!schedule) return [];
+    return schedule.subjects.map((subjectId: string) => subjects.find(subject => subject.id === subjectId)).filter(Boolean) as Subject[];
+  })();
+
+  // Build a list of { subject, occurrence } for today
+  const subjectOccurrenceList: { subject: Subject; occurrence: number }[] = [];
+  const occurrenceMap: Record<string, number> = {};
+  todayScheduleRaw.forEach((subject) => {
+    if (!subject) return;
+    if (!(subject.id in occurrenceMap)) occurrenceMap[subject.id] = 0;
+    subjectOccurrenceList.push({ subject, occurrence: occurrenceMap[subject.id] });
+    occurrenceMap[subject.id] += 1;
+  });
+
   const today = new Date().toISOString().split('T')[0];
 
-  // todaySubjects can have duplicate subjects for multiple classes
+  // Get today's attendance record for a subject occurrence
   const getTodayRecord = (subjectId: string, occurrence: number) => {
     return records.find(record => record.subjectId === subjectId && record.date === today && record.occurrence === occurrence);
+  };
+
+  // Bulk mark handler: mark all occurrences for today using correct occurrence index
+  const handleBulkMark = (status: 'attended' | 'absent' | 'off' | null) => {
+    if (typeof onBulkMarkAttendance === 'function') {
+      const updates = subjectOccurrenceList.map(({ subject, occurrence }) => ({
+        subjectId: subject.id,
+        occurrence,
+        status
+      }));
+      onBulkMarkAttendance(updates);
+    } else {
+      subjectOccurrenceList.forEach(({ subject, occurrence }) => {
+        onMarkAttendance(subject.id, occurrence, status);
+      });
+    }
   };
 
   const getStatusButton = (status: string, isActive: boolean, onClick: () => void, icon: React.ReactNode, label: string) => {
@@ -43,7 +78,7 @@ export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMark
     );
   };
 
-  if (todaySubjects.length === 0) {
+  if (subjectOccurrenceList.length === 0) {
     return (
       <div className="max-w-4xl mx-auto">
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
@@ -64,6 +99,7 @@ export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMark
     );
   }
 
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -82,15 +118,48 @@ export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMark
           </div>
         </div>
 
+        {/* Bulk attendance tab */}
+        <div className="flex justify-center gap-4 mb-8">
+          <div className="grid grid-cols-4 gap-2 w-full max-w-2xl">
+            {getStatusButton(
+              'attended',
+              false,
+              () => handleBulkMark('attended'),
+              <CheckCircle className="w-4 h-4" />,
+              'Attended'
+            )}
+            {getStatusButton(
+              'absent',
+              false,
+              () => handleBulkMark('absent'),
+              <XCircle className="w-4 h-4" />,
+              'Absent'
+            )}
+            {getStatusButton(
+              'off',
+              false,
+              () => handleBulkMark('off'),
+              <Clock className="w-4 h-4" />,
+              'Off'
+            )}
+            {getStatusButton(
+              'clear',
+              false,
+              () => handleBulkMark(null),
+              <Minus className="w-4 h-4" />,
+              'Clear'
+            )}
+          </div>
+        </div>
+
         <div className="space-y-4">
-          {todaySubjects.map((subject, idx) => {
-            // idx is the occurrence index for this subject today
-            const record = getTodayRecord(subject.id, idx);
+          {subjectOccurrenceList.map(({ subject, occurrence }) => {
+            const record = getTodayRecord(subject.id, occurrence);
             const currentStatus = record?.status;
 
             return (
               <div
-                key={subject.id + '-' + idx}
+                key={subject.id + '-' + occurrence}
                 className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-center justify-between mb-4">
@@ -102,7 +171,7 @@ export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMark
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white">{subject.name}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">{subject.code}</p>
-                      <span className="text-xs text-gray-400">Class {idx + 1} today</span>
+                      <span className="text-xs text-gray-400">Class {occurrence + 1} today</span>
                     </div>
                   </div>
                   {currentStatus && (
@@ -116,28 +185,28 @@ export const Home: React.FC<HomeProps> = ({ subjects, schedules, records, onMark
                   {getStatusButton(
                     'attended',
                     currentStatus === 'attended',
-                    () => onMarkAttendance(subject.id, idx, 'attended'),
+                    () => onMarkAttendance(subject.id, occurrence, 'attended'),
                     <CheckCircle className="w-4 h-4" />,
                     'Attended'
                   )}
                   {getStatusButton(
                     'absent',
                     currentStatus === 'absent',
-                    () => onMarkAttendance(subject.id, idx, 'absent'),
+                    () => onMarkAttendance(subject.id, occurrence, 'absent'),
                     <XCircle className="w-4 h-4" />,
                     'Absent'
                   )}
                   {getStatusButton(
                     'off',
                     currentStatus === 'off',
-                    () => onMarkAttendance(subject.id, idx, 'off'),
+                    () => onMarkAttendance(subject.id, occurrence, 'off'),
                     <Clock className="w-4 h-4" />,
                     'Off'
                   )}
                   {getStatusButton(
                     'clear',
                     false,
-                    () => onMarkAttendance(subject.id, idx, null),
+                    () => onMarkAttendance(subject.id, occurrence, null),
                     <Minus className="w-4 h-4" />,
                     'Clear'
                   )}

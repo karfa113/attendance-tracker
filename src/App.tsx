@@ -75,37 +75,47 @@ function App() {
 
   // Attendance management (now supports multiple occurrences per day)
   const handleMarkAttendance = (subjectId: string, occurrence: number, status: 'attended' | 'absent' | 'off' | null) => {
-    const today = new Date().toISOString().split('T')[0];
-    const existingRecord = records.find(record =>
-      record.subjectId === subjectId && record.date === today && record.occurrence === occurrence
-    );
+    handleBulkMarkAttendance([{ subjectId, occurrence, status }]);
+  };
 
-    if (status === null) {
-      // Clear attendance
-      if (existingRecord) {
-        setRecords(records.filter(record => record.id !== existingRecord.id));
-      }
-    } else {
-      if (existingRecord) {
-        // Update existing record
-        setRecords(records.map(record =>
-          record.id === existingRecord.id
-            ? { ...record, status, timestamp: Date.now() }
-            : record
-        ));
-      } else {
-        // Create new record
-        const newRecord: AttendanceRecord = {
-          id: Date.now().toString(),
-          subjectId,
-          date: today,
-          occurrence,
-          status,
-          timestamp: Date.now()
-        };
-        setRecords([...records, newRecord]);
-      }
-    }
+  // Bulk attendance handler
+  const handleBulkMarkAttendance = (updates: { subjectId: string; occurrence: number; status: 'attended' | 'absent' | 'off' | null }[]) => {
+    const today = new Date().toISOString().split('T')[0];
+    setRecords(prevRecords => {
+      let updatedRecords = [...prevRecords];
+      updates.forEach(({ subjectId, occurrence, status }) => {
+        const existingRecord = updatedRecords.find(record =>
+          record.subjectId === subjectId && record.date === today && record.occurrence === occurrence
+        );
+        if (status === null) {
+          // Clear attendance
+          if (existingRecord) {
+            updatedRecords = updatedRecords.filter(record => record.id !== existingRecord.id);
+          }
+        } else {
+          if (existingRecord) {
+            // Update existing record
+            updatedRecords = updatedRecords.map(record =>
+              record.id === existingRecord.id
+                ? { ...record, status, timestamp: Date.now() }
+                : record
+            );
+          } else {
+            // Create new record
+            const newRecord: AttendanceRecord = {
+              id: Date.now().toString() + Math.random().toString(36).slice(2),
+              subjectId,
+              date: today,
+              occurrence,
+              status,
+              timestamp: Date.now()
+            };
+            updatedRecords.push(newRecord);
+          }
+        }
+      });
+      return updatedRecords;
+    });
   };
 
   // Todo management
@@ -142,6 +152,7 @@ function App() {
             schedules={schedules}
             records={records}
             onMarkAttendance={handleMarkAttendance}
+            onBulkMarkAttendance={handleBulkMarkAttendance}
           />
         );
       case 'calendar':

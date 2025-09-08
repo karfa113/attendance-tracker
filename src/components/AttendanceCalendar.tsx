@@ -60,9 +60,50 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps & { schedules:
   };
 
   const renderCalendarDay = (day: number, isCurrentMonth: boolean) => {
-    const dayRecords = getRecordsForDate(day);
-    const hasRecords = dayRecords.length > 0;
+    // Get the weekday string for this date
+    const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    const weekday = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    // Find the schedule for this weekday
+    const schedule = (schedules || []).find((s: any) => s.day === weekday);
+    let scheduledSubjectIds: string[] = [];
+    if (schedule && Array.isArray(schedule.subjects)) {
+      scheduledSubjectIds = schedule.subjects;
+    }
+    // Build subject occurrence list for this day
+    const subjectOccurrenceList: { subjectId: string; occurrence: number }[] = [];
+    const occMap: Record<string, number> = {};
+    scheduledSubjectIds.forEach(subjectId => {
+      if (!(subjectId in occMap)) occMap[subjectId] = 0;
+      subjectOccurrenceList.push({ subjectId, occurrence: occMap[subjectId] });
+      occMap[subjectId] += 1;
+    });
+    // Get records for this date
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dayRecords = records.filter(record => record.date === dateStr);
     const isSelected = isCurrentMonth && selectedDay === day;
+
+    // Determine dot color for the day
+    let dotColor = 'bg-gray-300'; // empty
+    if (subjectOccurrenceList.length > 0) {
+      const statuses = subjectOccurrenceList.map(({ subjectId, occurrence }) => {
+        const rec = dayRecords.find(r => r.subjectId === subjectId && r.occurrence === occurrence);
+        return rec?.status || null;
+      });
+      const uniqueStatuses = Array.from(new Set(statuses));
+      if (uniqueStatuses.length === 1) {
+        switch (uniqueStatuses[0]) {
+          case 'attended': dotColor = 'bg-green-500'; break;
+          case 'absent': dotColor = 'bg-red-500'; break;
+          case 'off': dotColor = 'bg-blue-500'; break;
+          case null:
+          case undefined:
+          default: dotColor = 'bg-gray-300'; break;
+        }
+      } else if (uniqueStatuses.length > 1) {
+        dotColor = 'bg-purple-500'; // mixed
+      }
+    }
+
     return (
       <button
         key={day}
@@ -81,18 +122,22 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps & { schedules:
         <div className={`text-base font-semibold ${isSelected ? 'text-white dark:text-white' : isCurrentMonth ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-600'}`}>
           {day}
         </div>
-        {hasRecords && (
+        {subjectOccurrenceList.length > 0 && (
           <div className="flex gap-1 mt-1">
-            {dayRecords.map((record, index) => {
-              const subject = subjects.find(s => s.id === record.subjectId);
-              return (
-                <div
-                  key={index}
-                  className={`w-3 h-3 rounded-full border-2 border-white dark:border-gray-800 ${getStatusColor(record.status || undefined)}`}
-                  title={`${subject?.code || 'Unknown'} - ${record.status}`}
-                />
-              );
-            })}
+            <div
+              className={`w-3 h-3 rounded-full border-2 border-white dark:border-gray-800 ${dotColor}`}
+              title={
+                dotColor === 'bg-purple-500'
+                  ? 'Mixed attendance'
+                  : dotColor === 'bg-green-500'
+                    ? 'All attended'
+                    : dotColor === 'bg-red-500'
+                      ? 'All absent'
+                      : dotColor === 'bg-blue-500'
+                        ? 'All off'
+                        : 'Not marked'
+              }
+            />
           </div>
         )}
       </button>
@@ -218,86 +263,62 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps & { schedules:
           if (!scheduledSubjectIds.length && subjects.length) {
             scheduledSubjectIds = subjects.map(s => s.id);
           }
-          // For each scheduled subject, show the attendance record if exists, else show as not marked
+          // For each scheduled subject, show all occurrences (matching Home page logic)
           const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
           const dayRecords = records.filter(record => record.date === dateStr);
-          // For each subject occurrence, find the record or show as not marked
+          // Count occurrences for each subjectId
+          const occurrenceCount: Record<string, number> = {};
+          scheduledSubjectIds.forEach(subjectId => {
+            occurrenceCount[subjectId] = (occurrenceCount[subjectId] || 0) + 1;
+          });
+          // Build a flat list of { subjectId, occurrence }
+          const subjectOccurrenceList: { subjectId: string; occurrence: number }[] = [];
+          const occMap: Record<string, number> = {};
+          scheduledSubjectIds.forEach(subjectId => {
+            if (!(subjectId in occMap)) occMap[subjectId] = 0;
+            subjectOccurrenceList.push({ subjectId, occurrence: occMap[subjectId] });
+            occMap[subjectId] += 1;
+          });
           return (
             <div className="mt-6 bg-gray-100 dark:bg-gray-800 rounded-xl p-6">
               <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 {monthNames[currentDate.getMonth()]} {selectedDay}, {currentDate.getFullYear()}
               </h4>
-              {scheduledSubjectIds.length === 0 ? (
+              {subjectOccurrenceList.length === 0 ? (
                 <div className="text-gray-400 italic">No classes scheduled for this day.</div>
               ) : (
-                scheduledSubjectIds.map((subjectId) => {
+                subjectOccurrenceList.map(({ subjectId, occurrence }) => {
                   const subject = subjects.find(s => s.id === subjectId);
-                  // Find all records for this subject on this date (multiple occurrences possible)
-                  const subjectRecords = dayRecords.filter(r => r.subjectId === subjectId);
-                  // If no records, show one row as not marked
-                  if (subjectRecords.length === 0) {
-                    return (
-                      <div key={subjectId} className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-                        <div className="flex items-center gap-3">
-                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: subject?.color || '#6B7280' }}></span>
-                          <span className="font-semibold text-gray-900 dark:text-white">{subject?.name || 'Unknown'}</span>
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">{subject?.code}</span>
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">Class 1</span>
-                        </div>
-                        <div className="flex gap-2">
-                          {[{ value: 'attended', color: 'bg-green-500', label: 'Attended', icon: <Check className="w-4 h-4" /> }, { value: 'absent', color: 'bg-red-500', label: 'Absent', icon: <X className="w-4 h-4" /> }, { value: 'off', color: 'bg-blue-500', label: 'Off', icon: <Clock className="w-4 h-4" /> }, { value: null, color: 'bg-gray-700', label: 'Clear', icon: <Minus className="w-4 h-4" /> }].map(option => (
-                            <button
-                              key={option.label}
-                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center focus:outline-none transition-colors
-                                ${option.color} opacity-60 hover:opacity-100`}
-                              title={option.label}
-                              onClick={() => onEditAttendance(
-                                dateStr,
-                                subjectId,
-                                0,
-                                option.value as any
-                              )}
-                              aria-label={option.label}
-                            >
-                              {option.icon}
-                            </button>
-                          ))}
-                        </div>
+                  const record = dayRecords.find(r => r.subjectId === subjectId && r.occurrence === occurrence);
+                  return (
+                    <div key={subjectId + '-' + occurrence} className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                      <div className="flex items-center gap-3">
+                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: subject?.color || '#6B7280' }}></span>
+                        <span className="font-semibold text-gray-900 dark:text-white">{subject?.name || 'Unknown'}</span>
+                        <span className="text-gray-500 dark:text-gray-400 text-sm">{subject?.code}</span>
+                        <span className="text-gray-500 dark:text-gray-400 text-sm">Class {occurrence + 1}</span>
                       </div>
-                    );
-                  }
-                  // If records exist, show each occurrence
-                  return subjectRecords.map((record, occIdx) => {
-                    return (
-                      <div key={subjectId + '-' + occIdx} className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-                        <div className="flex items-center gap-3">
-                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: subject?.color || '#6B7280' }}></span>
-                          <span className="font-semibold text-gray-900 dark:text-white">{subject?.name || 'Unknown'}</span>
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">{subject?.code}</span>
-                          <span className="text-gray-500 dark:text-gray-400 text-sm">Class {record.occurrence + 1}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          {[{ value: 'attended', color: 'bg-green-500', label: 'Attended', icon: <Check className="w-4 h-4" /> }, { value: 'absent', color: 'bg-red-500', label: 'Absent', icon: <X className="w-4 h-4" /> }, { value: 'off', color: 'bg-blue-500', label: 'Off', icon: <Clock className="w-4 h-4" /> }, { value: null, color: 'bg-gray-700', label: 'Clear', icon: <Minus className="w-4 h-4" /> }].map(option => (
-                            <button
-                              key={option.label}
-                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center focus:outline-none transition-colors
-                                ${option.color} ${record.status === option.value ? 'ring-2 ring-blue-400' : 'opacity-60 hover:opacity-100'}`}
-                              title={option.label}
-                              onClick={() => onEditAttendance(
-                                dateStr,
-                                subjectId,
-                                record.occurrence ?? 0,
-                                option.value as any
-                              )}
-                              aria-label={option.label}
-                            >
-                              {option.icon}
-                            </button>
-                          ))}
-                        </div>
+                      <div className="flex gap-2">
+                        {[{ value: 'attended', color: 'bg-green-500', label: 'Attended', icon: <Check className="w-4 h-4" /> }, { value: 'absent', color: 'bg-red-500', label: 'Absent', icon: <X className="w-4 h-4" /> }, { value: 'off', color: 'bg-blue-500', label: 'Off', icon: <Clock className="w-4 h-4" /> }, { value: null, color: 'bg-gray-700', label: 'Clear', icon: <Minus className="w-4 h-4" /> }].map(option => (
+                          <button
+                            key={option.label}
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center focus:outline-none transition-colors
+                              ${option.color} ${(record && record.status === option.value) ? 'ring-2 ring-blue-400' : 'opacity-60 hover:opacity-100'}`}
+                            title={option.label}
+                            onClick={() => onEditAttendance(
+                              dateStr,
+                              subjectId,
+                              occurrence,
+                              option.value as any
+                            )}
+                            aria-label={option.label}
+                          >
+                            {option.icon}
+                          </button>
+                        ))}
                       </div>
-                    );
-                  });
+                    </div>
+                  );
                 })
               )}
             </div>
