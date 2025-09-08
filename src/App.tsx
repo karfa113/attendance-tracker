@@ -149,6 +149,7 @@ function App() {
           <AttendanceCalendar
             records={records}
             subjects={subjects}
+            schedules={schedules}
             onEditAttendance={(
               date: string,
               subjectId: string,

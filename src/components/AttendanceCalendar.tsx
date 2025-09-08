@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { AttendanceRecord, Subject } from '../types/attendance';
 
@@ -8,10 +8,30 @@ interface AttendanceCalendarProps {
   onEditAttendance: (date: string, subjectId: string, occurrence: number, status: 'attended' | 'absent' | 'off' | null) => void;
 }
 
-export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ records, subjects, onEditAttendance }) => {
+export const AttendanceCalendar: React.FC<AttendanceCalendarProps & { schedules: any[] }> = ({ records, subjects, onEditAttendance, schedules }) => {
   // Start with today as default
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  // By default, select today's date if in current month, else first day
+  const today = new Date();
+  const isCurrentMonth =
+    today.getFullYear() === currentDate.getFullYear() &&
+    today.getMonth() === currentDate.getMonth();
+  const [selectedDay, setSelectedDay] = useState<number | null>(
+    isCurrentMonth ? today.getDate() : 1
+  );
+
+  // When month changes, update selectedDay to today if in current month, else 1
+  useEffect(() => {
+    if (
+      today.getFullYear() === currentDate.getFullYear() &&
+      today.getMonth() === currentDate.getMonth()
+    ) {
+      setSelectedDay(today.getDate());
+    } else {
+      setSelectedDay(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDate]);
 
   const getStatusColor = (status: string | null | undefined) => {
     switch (status) {
@@ -179,62 +199,110 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ records,
             <span className="text-gray-700 dark:text-gray-200">Off</span>
           </div>
         </div>
-        {/* Attendance details for selected day */}
-        {selectedDay && (
-          <div className="mt-6 bg-gray-100 dark:bg-gray-800 rounded-xl p-6">
-            <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {monthNames[currentDate.getMonth()]} {selectedDay}, {currentDate.getFullYear()}
-            </h4>
-            {/* List subjects and attendance for the selected day */}
-            {(() => {
-              const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
-              const dayRecords = records.filter(record => record.date === dateStr);
-              if (dayRecords.length === 0) {
-                return <div className="text-gray-400 italic">No attendance records for this date.</div>;
-              }
-              return dayRecords.map((record, idx) => {
-                const subject = subjects.find(s => s.id === record.subjectId);
-                const statusOptions: Array<{ value: 'attended' | 'absent' | 'off' | null, color: string, label: string }> = [
-                  { value: 'attended', color: 'bg-green-500', label: 'Attended' },
-                  { value: 'absent', color: 'bg-red-500', label: 'Absent' },
-                  { value: 'off', color: 'bg-blue-500', label: 'Off' },
-                  { value: null, color: 'bg-gray-700', label: 'Clear' },
-                ];
-                return (
-                  <div key={idx} className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-                    <div className="flex items-center gap-3">
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: subject?.color || '#6B7280' }}></span>
-                      <span className="font-semibold text-gray-900 dark:text-white">{subject?.name || 'Unknown'}</span>
-                      <span className="text-gray-500 dark:text-gray-400 text-sm">{subject?.code}</span>
-                      <span className="text-gray-500 dark:text-gray-400 text-sm">Class {record.occurrence + 1}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      {statusOptions.map(option => (
-                        <button
-                          key={option.label}
-                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center focus:outline-none transition-colors
-                            ${option.color} ${record.status === option.value ? 'ring-2 ring-blue-400' : 'opacity-60 hover:opacity-100'}`}
-                          title={option.label}
-                          onClick={() => onEditAttendance(
-                            `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
-                            record.subjectId,
-                            record.occurrence ?? 0,
-                            option.value
-                          )}
-                          aria-label={option.label}
-                        >
-                          {option.value === null ? (
-                            <span className="w-3 h-3 rounded-full bg-gray-200 dark:bg-gray-900 block"></span>
-                          ) : null}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        )}
+        {/* Attendance details for selected day: always show scheduled classes for that weekday */}
+        {selectedDay && (() => {
+          // Get the weekday string for the selected date
+          const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay);
+          const weekday = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+          // Find the schedule for this weekday from props (passed from App)
+          const schedule = (schedules || []).find((s: any) => s.day === weekday);
+          let scheduledSubjectIds: string[] = [];
+          if (schedule && Array.isArray(schedule.subjects)) {
+            scheduledSubjectIds = schedule.subjects;
+          }
+          // If not found, fallback to showing all subjects (should not happen)
+          if (!scheduledSubjectIds.length && subjects.length) {
+            scheduledSubjectIds = subjects.map(s => s.id);
+          }
+          // For each scheduled subject, show the attendance record if exists, else show as not marked
+          const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+          const dayRecords = records.filter(record => record.date === dateStr);
+          // For each subject occurrence, find the record or show as not marked
+          return (
+            <div className="mt-6 bg-gray-100 dark:bg-gray-800 rounded-xl p-6">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                {monthNames[currentDate.getMonth()]} {selectedDay}, {currentDate.getFullYear()}
+              </h4>
+              {scheduledSubjectIds.length === 0 ? (
+                <div className="text-gray-400 italic">No classes scheduled for this day.</div>
+              ) : (
+                scheduledSubjectIds.map((subjectId) => {
+                  const subject = subjects.find(s => s.id === subjectId);
+                  // Find all records for this subject on this date (multiple occurrences possible)
+                  const subjectRecords = dayRecords.filter(r => r.subjectId === subjectId);
+                  // If no records, show one row as not marked
+                  if (subjectRecords.length === 0) {
+                    return (
+                      <div key={subjectId} className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                        <div className="flex items-center gap-3">
+                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: subject?.color || '#6B7280' }}></span>
+                          <span className="font-semibold text-gray-900 dark:text-white">{subject?.name || 'Unknown'}</span>
+                          <span className="text-gray-500 dark:text-gray-400 text-sm">{subject?.code}</span>
+                          <span className="text-gray-500 dark:text-gray-400 text-sm">Class 1</span>
+                        </div>
+                        <div className="flex gap-2">
+                          {[{ value: 'attended', color: 'bg-green-500', label: 'Attended' }, { value: 'absent', color: 'bg-red-500', label: 'Absent' }, { value: 'off', color: 'bg-blue-500', label: 'Off' }, { value: null, color: 'bg-gray-700', label: 'Clear' }].map(option => (
+                            <button
+                              key={option.label}
+                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center focus:outline-none transition-colors
+                                ${option.color} opacity-60 hover:opacity-100`}
+                              title={option.label}
+                              onClick={() => onEditAttendance(
+                                dateStr,
+                                subjectId,
+                                0,
+                                option.value as any
+                              )}
+                              aria-label={option.label}
+                            >
+                              {option.value === null ? (
+                                <span className="w-3 h-3 rounded-full bg-gray-200 dark:bg-gray-900 block"></span>
+                              ) : null}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                  // If records exist, show each occurrence
+                  return subjectRecords.map((record, occIdx) => {
+                    return (
+                      <div key={subjectId + '-' + occIdx} className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                        <div className="flex items-center gap-3">
+                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: subject?.color || '#6B7280' }}></span>
+                          <span className="font-semibold text-gray-900 dark:text-white">{subject?.name || 'Unknown'}</span>
+                          <span className="text-gray-500 dark:text-gray-400 text-sm">{subject?.code}</span>
+                          <span className="text-gray-500 dark:text-gray-400 text-sm">Class {record.occurrence + 1}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          {[{ value: 'attended', color: 'bg-green-500', label: 'Attended' }, { value: 'absent', color: 'bg-red-500', label: 'Absent' }, { value: 'off', color: 'bg-blue-500', label: 'Off' }, { value: null, color: 'bg-gray-700', label: 'Clear' }].map(option => (
+                            <button
+                              key={option.label}
+                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center focus:outline-none transition-colors
+                                ${option.color} ${record.status === option.value ? 'ring-2 ring-blue-400' : 'opacity-60 hover:opacity-100'}`}
+                              title={option.label}
+                              onClick={() => onEditAttendance(
+                                dateStr,
+                                subjectId,
+                                record.occurrence ?? 0,
+                                option.value as any
+                              )}
+                              aria-label={option.label}
+                            >
+                              {option.value === null ? (
+                                <span className="w-3 h-3 rounded-full bg-gray-200 dark:bg-gray-900 block"></span>
+                              ) : null}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  });
+                })
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
